@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Симулятор Деда: Симулятор ворчания</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Courier New', Courier, monospace; }
+        body { 
+            background-color: #1a252f; 
+            color: #ecf0f1; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            user-select: none; 
+            padding: 20px;
+        }
+
+        .game-container { 
+            background-color: #2c3e50; 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7); 
+            text-align: center; 
+            width: 100%;
+            max-width: 420px; 
+            border: 4px solid #7f8c8d; 
+            position: relative;
+        }
+
+        h1 { font-size: 22px; margin: 0 0 5px 0; color: #f1c40f; text-shadow: 1px 1px 2px #000; }
+        .status { font-size: 13px; color: #bdc3c7; margin-bottom: 15px; }
+
+        /* Шкала здоровья */
+        .health-section { margin-bottom: 15px; }
+        .health-header { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
+        .health-bar-bg { background: #7f8c8d; height: 18px; border-radius: 9px; overflow: hidden; border: 2px solid #34495e; }
+        .health-bar-fill { background: linear-gradient(90deg, #e74c3c, #2ecc71); height: 100%; width: 100%; transition: width 0.4s ease; }
+
+        /* Статистика */
+        .stats { background: #1a252f; padding: 12px 15px; border-radius: 8px; margin-bottom: 15px; text-align: left; border: 1px solid #34495e; }
+        .stat-line { font-size: 16px; margin: 4px 0; display: flex; justify-content: space-between; }
+
+        /* Кнопка клика */
+        .click-btn { 
+            background: linear-gradient(180deg, #e74c3c, #c0392b); 
+            color: white; 
+            border: none; 
+            padding: 18px; 
+            font-size: 18px; 
+            font-weight: bold; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            width: 100%; 
+            box-shadow: 0 5px #7f8c8d; 
+            transition: all 0.1s; 
+            text-shadow: 1px 1px 1px #000;
+        }
+        .click-btn:active { box-shadow: 0 1px #7f8c8d; transform: translateY(4px); }
+
+        /* Магазин */
+        .shop { margin-top: 20px; text-align: left; }
+        .shop-title { font-size: 15px; color: #f1c40f; margin-bottom: 8px; border-bottom: 1px solid #7f8c8d; padding-bottom: 4px; font-weight: bold; }
+        .upgrade-btn { 
+            background-color: #27ae60; 
+            color: white; 
+            border: none; 
+            padding: 10px; 
+            width: 100%; 
+            margin-bottom: 8px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 13px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            transition: background 0.2s; 
+        }
+        .upgrade-btn:hover:not(:disabled) { background-color: #2ecc71; }
+        .upgrade-btn:disabled { background-color: #7f8c8d; cursor: not-allowed; opacity: 0.7; }
+        .upgrade-btn.heal-btn { background-color: #8e44ad; }
+        .upgrade-btn.heal-btn:hover:not(:disabled) { background-color: #9b59b6; }
+
+        /* Модальные окна */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .modal-overlay.hidden { display: none; }
+        
+        .modal-content {
+            background: #2c3e50;
+            border: 3px solid #f1c40f;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 380px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(241, 196, 15, 0.4);
+        }
+
+        .modal-title { font-size: 18px; color: #f1c40f; margin-bottom: 10px; }
+        .modal-text { font-size: 14px; margin-bottom: 20px; line-height: 1.4; color: #ecf0f1; }
+        .modal-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px 0;
+            width: 100%;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .modal-btn:hover { background-color: #2980b9; }
+
+        .reset-btn {
+            background: transparent;
+            border: none;
+            color: #e74c3c;
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>👴 ДЕД НА ЛАВКЕ</h1>
+        <div class="status">Симулятор ворчания v2.0</div>
+
+        <!-- Здоровье -->
+        <div class="health-section">
+            <div class="health-header">
+                <span>❤️ Валидол / Здоровье</span>
+                <span id="health-num">100%</span>
+            </div>
+            <div class="health-bar-bg">
+                <div class="health-bar-fill" id="health-bar"></div>
+            </div>
+        </div>
+
+        <!-- Статистика -->
+        <div class="stats">
+            <div class="stat-line"><span>🤬 Ворчание:</span> <b id="grump-count">0</b></div>
+            <div class="stat-line"><span>⏱ В секунду:</span> <b id="gps-count">0</b></div>
+            <div class="stat-line"><span>💥 За клик:</span> <b id="gpc-count">1</b></div>
+        </div>
+
+        <button class="click-btn" id="click-target">СЛЫШЬ, НАРКОМАН!</button>
+
+        <!-- Магазин -->
+        <div class="shop">
+            <div class="shop-title">Аптека и Улучшения:</div>
+            <button class="upgrade-btn heal-btn" id="upg-validol" disabled>
+                <span>💊 Валидол (+15% HP)</span> <b id="validol-cost">20</b>
+            </button>
+            <button class="upgrade-btn" id="upg-stick" disabled>
+                <span>🩼 Старая трость (+1 к клику)</span> <b id="stick-cost">15</b>
+            </button>
+            <button class="upgrade-btn" id="upg-babka" disabled>
+                <span>👵 Баба Дуся (+1 в сек)</span> <b id="babka-cost">50</b>
+            </button>
+            <button class="upgrade-btn" id="upg-radio" disabled>
+                <span>📻 Радио «Маяк» (+5 в сек)</span> <b id="radio-cost">250</b>
+            </button>
+        </div>
+
+        <button class="reset-btn" id="reset-game">Начать сначала</button>
+    </div>
+
+    <!-- Модальное окно Квестов -->
+    <div class="modal-overlay hidden" id="event-modal">
+        <div class="modal-content">
+            <div class="modal-title" id="event-title">Событие на улице!</div>
+            <div class="modal-text" id="event-text">Описание события...</div>
+            <div id="event-choices"></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно Game Over -->
+    <div class="modal-overlay hidden" id="gameover-modal">
+        <div class="modal-content">
+            <div class="modal-title" style="color: #e74c3c;">💊 GAME OVER</div>
+            <div class="modal-text">Деду стало совсем худо... Внуки сдали его в санаторий!</div>
+            <button class="modal-btn" id="restart-btn" style="background-color: #e74c3c;">Начать заново</button>
+        </div>
+    </div>
+
+    <script>
+        // Игровое состояние
+        let state = {
+            grump: 0,
+            grumpPerClick: 1,
+            grumpPerSecond: 0,
+            health: 100,
+            stickCost: 15,
+            babkaCost: 50,
+            radioCost: 250,
+            validolCost: 20
+        };
+
+        // DOM элементы
+        const grumpDisplay = document.getElementById('grump-count');
+        const gpsDisplay = document.getElementById('gps-count');
+        const gpcDisplay = document.getElementById('gpc-count');
+        const healthNum = document.getElementById('health-num');
+        const healthBar = document.getElementById('health-bar');
+        const clickBtn = document.getElementById('click-target');
+
+        const upgValidol = document.getElementById('upg-validol');
+        const upgStick = document.getElementById('upg-stick');
+        const upgBabka = document.getElementById('upg-babka');
+        const upgRadio = document.getElementById('upg-radio');
+
+        const validolCostDisplay = document.getElementById('validol-cost');
+        const stickCostDisplay = document.getElementById('stick-cost');
+        const babkaCostDisplay = document.getElementById('babka-cost');
+        const radioCostDisplay = document.getElementById('radio-cost');
+
+        const eventModal = document.getElementById('event-modal');
+        const eventTitle = document.getElementById('event-title');
+        const eventText = document.getElementById('event-text');
+        const eventChoices = document.getElementById('event-choices');
+
+        const gameoverModal = document.getElementById('gameover-modal');
+        const restartBtn = document.getElementById('restart-btn');
+        const resetBtn = document.getElementById('reset-game');
+
+        // Массив квестов
+        const events = [
+            {
+                title: "🛴 Самокатчик впереди!",
+                text: "Курьер на электросамокате летит прямо на лавочку!",
+                choices: [
+                    {
+                        text: "Сбить тростью (50% шанс)",
+                        action: () => {
+                            if (Math.random() < 0.5) {
+                                state.grump += 100;
+                                alert("Успех! Самокат повержен. Вы получили +100 ворчания!");
+                            } else {
+                                state.health = Math.max(0, state.health - 20);
+                                alert("Неудача! Самокатчик задел деда. -20% здоровья!");
+                            }
+                        }
+                    },
+                    {
+                        text: "Прокричать лекцию о ПДД",
+                        action: () => {
+                            state.grump += 30;
+                            alert("Вы прокричали вслед кучу гадостей. +30 ворчания!");
+                        }
+                    }
+                ]
+            },
+            {
+                title: "🐕 Соседский шпиц",
+                text: "Соседка вывела мелкую собаку, которая начала громко тявкать.",
+                choices: [
+                    {
+                        text: "Затянуть историю: «А вот в 1974-м...»",
+                        action: () => {
+                            state.grump += 50;
+                            alert("Соседка ушла в ужасе. +50 ворчания!");
+                        }
+                    },
+                    {
+                        text: "Попытаться встать и прогнать",
+                        action: () => {
+                            if (Math.random() < 0.4) {
+                                state.grump += 120;
+                                alert("Дед выглядел настолько сурово, что собака сбежала! +120 ворчания!");
+                            } else {
+                                state.health = Math.max(0, state.health - 15);
+                                alert("При попытке встать прихватило поясницу! -15% здоровья!");
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                title: "🗑 Подозрительный мусор",
+                text: "Возле лавочки кто-то бросил пустую бутылку.",
+                choices: [
+                    {
+                        text: "Громко заявить: «Молодежь совсем страх потеряла!»",
+                        action: () => {
+                            state.grump += 40;
+                            alert("Прохожие стыдливо опустили глаза. +40 ворчания!");
+                        }
+                    },
+                    {
+                        text: "Сдать бутылку (Рискованный шаг)",
+                        action: () => {
+                            if (Math.random() < 0.6) {
+                                state.grump += 80;
+                                alert("Бутылка успешно сдана! +80 ворчания!");
+                            } else {
+                                state.health = Math.max(0, state.health - 10);
+                                alert("При наклоне закружилась голова! -10% здоровья.");
+                            }
+                        }
+                    }
+                ]
+            }
+        ];
+
+        // Обновление интерфейса
+        function updateUI() {
+            grumpDisplay.innerText = Math.floor(state.grump);
+            gpsDisplay.innerText = state.grumpPerSecond;
+            gpcDisplay.innerText = state.grumpPerClick;
+
+            healthNum.innerText = `${Math.round(state.health)}%`;
+            healthBar.style.width = `${Math.max(0, state.health)}%`;
+
+            // Смена цвета шкалы HP при низком уровне
+            if (state.health < 30) {
+                healthBar.style.background = '#e74c3c';
+            } else {
+                healthBar.style.background = 'linear-gradient(90deg, #e74c3c, #2ecc71)';
+            }
+
+            // Доступность кнопок
+            upgValidol.disabled = state.grump < state.validolCost || state.health >= 100;
+            upgStick.disabled = state.grump < state.stickCost;
+            upgBabka.disabled = state.grump < state.babkaCost;
+            upgRadio.disabled = state.grump < state.radioCost;
+
+            // Цены
+            validolCostDisplay.innerText = state.validolCost;
+            stickCostDisplay.innerText = state.stickCost;
+            babkaCostDisplay.innerText = state.babkaCost;
+            radioCostDisplay.innerText = state.radioCost;
+        }
+
+        // Сохранение и загрузка
+        function saveGame() {
+            localStorage.setItem('grandpa_clicker_save', JSON.stringify(state));
+        }
+
+        function loadGame() {
+            const saved = localStorage.getItem('grandpa_clicker_save');
+            if (saved) {
+                try {
+                    state = { ...state, ...JSON.parse(saved) };
+                } catch (e) {
+                    console.error("Ошибка загрузки сохранения", e);
+                }
+            }
+        }
+
+        function resetGame() {
+            localStorage.removeItem('grandpa_clicker_save');
+            state = {
+                grump: 0,
+                grumpPerClick: 1,
+                grumpPerSecond: 0,
+                health: 100,
+                stickCost: 15,
+                babkaCost: 50,
+                radioCost: 250,
+                validolCost: 20
+            };
+            gameoverModal.classList.add('hidden');
+            updateUI();
+        }
+
+        function triggerGameOver() {
+            gameoverModal.classList.remove('hidden');
+        }
+
+        // Событие Квеста
+        function triggerRandomEvent() {
+            if (!eventModal.classList.contains('hidden') || !gameoverModal.classList.contains('hidden')) return;
+
+            const randomQuest = events[Math.floor(Math.random() * events.length)];
+            eventTitle.innerText = randomQuest.title;
+            eventText.innerText = randomQuest.text;
+            eventChoices.innerHTML = '';
+
+            randomQuest.choices.forEach(choice => {
+                const btn = document.createElement('button');
+                btn.className = 'modal-btn';
+                btn.innerText = choice.text;
+                btn.onclick = () => {
+                    choice.action();
+                    eventModal.classList.add('hidden');
+                    updateUI();
+                    saveGame();
+                };
+                eventChoices.appendChild(btn);
+            });
+
+            eventModal.classList.remove('hidden');
+        }
+
+        // Слушатели событий
+        clickBtn.addEventListener('click', () => {
+            state.grump += state.grumpPerClick;
+            const phrases = [
+                "СЛЫШЬ, НАРКОМАН!", 
+                "ПРОСТИТУТКА!", 
+                "ИШЬ, НАПЯЛИЛА!", 
+                "РАБОТАТЬ ИДИ!", 
+                "СТАЛИНА НА ВАС НЕТ!",
+                "ОБВЕСИЛИ В МАГАЗИНЕ!"
+            ];
+            if (Math.random() < 0.25) {
+                clickBtn.innerText = phrases[Math.floor(Math.random() * phrases.length)];
+            }
+            updateUI();
+        });
+
+        // Покупка Валидола
+        upgValidol.addEventListener('click', () => {
+            if (state.grump >= state.validolCost && state.health < 100) {
+                state.grump -= state.validolCost;
+                state.health = Math.min(100, state.health + 15);
+                updateUI();
+                saveGame();
+            }
+        });
+
+        // Покупки апгрейдов
+        upgStick.addEventListener('click', () => {
+            if (state.grump >= state.stickCost) {
+                state.grump -= state.stickCost;
+                state.grumpPerClick += 1;
+                state.stickCost = Math.round(state.stickCost * 1.5);
+                updateUI();
+                saveGame();
+            }
+        });
+
+        upgBabka.addEventListener('click', () => {
+            if (state.grump >= state.babkaCost) {
+                state.grump -= state.babkaCost;
+                state.grumpPerSecond += 1;
+                state.babkaCost = Math.round(state.babkaCost * 1.5);
+                updateUI();
+                saveGame();
+            }
+        });
+
+        upgRadio.addEventListener('click', () => {
+            if (state.grump >= state.radioCost) {
+                state.grump -= state.radioCost;
+                state.grumpPerSecond += 5;
+                state.radioCost = Math.round(state.radioCost * 1.6);
+                updateUI();
+                saveGame();
+            }
+        });
+
+        restartBtn.addEventListener('click', resetGame);
+        resetBtn.addEventListener('click', () => {
+            if (confirm("Точно сбросить весь прогресс?")) {
+                resetGame();
+            }
+        });
+
+        // Таймеры игры
+        // 1. Пассивный доход каждую секунду
+        setInterval(() => {
+            if (state.health > 0) {
+                state.grump += state.grumpPerSecond;
+                updateUI();
+            }
+        }, 1000);
+
+        // 2. Уменьшение здоровья каждые 5 секунд на 2%
+        setInterval(() => {
+            if (state.health > 0) {
+                state.health -= 2;
+                if (state.health <= 0) {
+                    state.health = 0;
+                    updateUI();
+                    triggerGameOver();
+                } else {
+                    updateUI();
+                }
+            }
+        }, 5000);
+
+        // 3. Автосохранение каждые 5 секунд
+        setInterval(saveGame, 5000);
+
+        // 4. Генерация случайных событий каждые 30 секунд
+        setInterval(triggerRandomEvent, 30000);
+
+        // Старт игры
+        loadGame();
+        updateUI();
+    </script>
+</body>
+</html>
